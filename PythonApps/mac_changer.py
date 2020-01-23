@@ -3,7 +3,8 @@ import re
 import subprocess
 import random
 import string
-
+import os
+import binascii
 
 
 
@@ -43,17 +44,21 @@ class SystemException(Exception):
 
 def randomMac():
     # to generate a random mac
-    choices = string.digits + string.ascii_lowercase
-    res = [random.choice(choices) for x in range(12)]
-    random_mac = ':'.join([str(res[n]) + str(res[n+1]) for n in (0,2,4,6,8,10)])
+    base = "02:00:00"
+    res = binascii.b2a_hex(os.urandom(12))
+    res = res.decode('utf-8')
+    # random_mac = ':'.join([str(res[n]) + str(res[n+1]) for n in (0,2,4,6,8,10)])
+    random_mac = base + ":%02x:%02x:%02x" % (random.randint(0, 255),
+                             random.randint(0, 255),
+                             random.randint(0, 255))
     return random_mac
 
 
 
-def checkArgs():
+def checkArgs(rndm=None):
     # checking input
     global args
-    matched = re.search(r"(([0-9a-zA-Z]){2}:){5}([0-9a-zA-Z]){2}",args.mac)
+    matched = re.search(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$",args.mac)
     if matched :
         return
     else :
@@ -63,28 +68,33 @@ def changeMac():
     # changing mac-addr
     global args
     try :
-        if args.randomized : 
+        if args.randomized :
+            rndmmac = randomMac()
             subprocess.call(['ifconfig', args.nic, 'down']) 
-            subprocess.call(['ifconfig', args.nic, 'hw', 'ether', randomMac()])
-            subprocess.call(['ifconfig', args.nic, 'up'])
+            subprocess.call(['ifconfig', args.nic, 'hw', 'ether', rndmmac])
+            x = subprocess.call(['ifconfig', args.nic, 'up'])
+            if x != 0:
+                raise SystemException(msg="[-] couldn't change mac. system problem")
         else :
+            checkArgs()
             subprocess.call(['ifconfig', args.nic, 'down']) 
             subprocess.call(['ifconfig', args.nic, 'hw', 'ether', args.mac])
-            subprocess.call(['ifconfig', args.nic, 'up'])
+            x = subprocess.call(['ifconfig', args.nic, 'up'])
+            if x != 0 :
+                raise SystemException(msg="[-] couldn't change mac. system problem")
     except Exception:
         raise SystemException(msg="[-] couldn't change mac. system problem")
 
 def main() :
     # running the all commands above
     try : 
-        checkArgs()
         changeMac()
     except SystemException as e:
         print(e.msg)
     except InputExcpetion as e :
         print(e.msg)
     except Exception as e :
-        print() 
+        print('[-] couldn\'t change mac') 
     else :
         print("[+] mac changed successfully.")
 
