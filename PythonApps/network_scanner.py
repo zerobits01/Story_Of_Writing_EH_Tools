@@ -1,14 +1,13 @@
 '''
     author : zerobits01
     created: 24-Jan-2020
-    purpose: scanning the network and finds connected devices
-                their IP and mac-address
+    purpose: scanning the network and discover all other
+                connected devices IP and mac-address
 '''
 
-# we can use python nmap module(lib) too but am trying to
+# we can use python nmap module(lib) too but, am trying to
 # implement my own net-scanner
 
-# TODO : implementing subnet and pinging other ips
 import scapy.all as scapy
 import argparse
 import asyncio
@@ -46,8 +45,10 @@ parser.add_argument('-r','--range',help='pass the ip or ip range',
 
 args = parser.parse_args()
 result = None
+
 def net_scan_auto(ip):
     # using scapy.arping we gonna use arp protocol to find out macs
+    # this method does the job automatically
     scapy.arping(ip)
 
 @force_async
