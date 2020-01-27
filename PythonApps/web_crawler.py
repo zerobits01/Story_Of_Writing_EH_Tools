@@ -101,19 +101,20 @@ class Crawler:
                     # and do it more efficient
             return links_set
     def spider(self,url, depth): # crawler
-        result = {}  # it is more efficient to use set instead of lists
-        checked = {}
+        depth_list = []
+        for i in range(depth):
+            depth_list.append({})
+        all_links = {url}
         # we can use multi-threading but in the simplest way we use for-loop
-        result.add(self.extractor(url=url))
-        for sub_url in result:
-            checked.add(sub_url)
-            result.remove(sub_url)
-            if sub_url not in checked:
-                res = self.extractor(sub_url)
-                for r in res:
-                    result.add(r)
+        depth_list[0] = self.extractor(url=url)
+        all_links = all_links.union(depth_list[0])
+        for i in range(depth):
+            for sub_url in depth_list[i]:
+                if sub_url not in all_links:
+                    all_links.add(sub_url)
+                    depth_list[i+1] = self.extractor(sub_url)
 
-
+        return {u for u in all_links}
 
 
 # the point is that we have to create word-lists for different attacks
