@@ -12,15 +12,13 @@ import scapy.all as scapy
 import argparse
 import asyncio
 import functools
-
+from concurrent.futures import ThreadPoolExecutor
 
 
 def force_async(fn):
     '''
-    turns a sync function to async function using threads
+        turns a sync function to async function using threads
     '''
-    from concurrent.futures import ThreadPoolExecutor
-    import asyncio
     pool = ThreadPoolExecutor()
 
     @functools.wraps(fn)
@@ -72,9 +70,9 @@ def net_scan_manually(ip):
             srp : send and receive (ether customized)
                 srp returns two values (answered, unanswered)
     '''
-    nodes, _ = scapy.srp(arp_req, timeout=1, verbose=False) # _ is unanswered packets
+    nodes, _ = scapy.srp(arp_req, timeout=5, verbose=False) # _ is unanswered packets
     global result
-    result = [{'ip' : node[1].pdst,'mac' : node[1].hwdst} for node in nodes]
+    result = [{'ip' : resp.psrc,'mac' : resp.hwsrc} for (_,resp) in nodes]
 
 def print_result(nodes):
     print()
@@ -101,9 +99,9 @@ async def printWait():
     global result
     counter = 0
     while result is None:
-        time.sleep(0.25)
         string = '.' if counter == 0 else '..' if counter == 1 else '...'
-        print('\b\r[!]sending requests' + string + ' ', end='')
+        print('\b\r[!]sending requests' + string + '  ', end='')
+        time.sleep(0.25)
         counter = counter + 1 if counter <= 2 else 0
 
 async def main():
