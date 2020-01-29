@@ -48,7 +48,7 @@ class SocketHandler(threading.Thread):
             if f.readable():
                 data_to_send = f.readlines()
                 filename = os.path.split(path)[-1]
-                datatosend = { filename : ''.join(data_to_send)}
+                data_to_send = { filename : ''.join(data_to_send)}
                 return data_to_send
             else :
                 print('[-] file is not allowed to read?!?')
