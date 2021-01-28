@@ -48,6 +48,9 @@ parser.add_argument('-r','--range',type=str,
 
 args = parser.parse_args()
 
+dup_ip_regex = re.compile(r"(?P<mac_addr>\d{2}\.\d{2}\.\d{2}\.\d{2}\.\d{2}\.\d{2}) (?P<ip_addr>\(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\))")
+
+FILE_PATH = "/tmp/arping_ouput.txt"
 
 class Validator(object):
 
@@ -113,25 +116,54 @@ def getMac(src, ip):
         exit(1)
 
 
-# results, unanswered = sr(ARP(op=ARP.who_has, psrc='192.168.1.2', pdst='192.168.1.1'))
-# 1 req two replies, i have to handle this
+def checkDuplicate():
+    check_dict = {}
+    # sample: 5a:0a:cd:46:97:54 (192.168.1.129)
+    dup_ip_regex = re.compile(r"(?P<mac_addr>\d{2}\.\d{2}\.\d{2}\.\d{2}\.\d{2}\.\d{2}) (?P<ip_addr>\(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\))")
+    with open(FILE_PATH, "r") as f:
+        lines = f.readlines()
+        for line in lines:
+            m = dup_ip_regex.search(line)
+            if m:
+                ip_addr = m.group("ip_addr")
+                if ip_addr in check_dict.keys():
+                    print(20*"#")
+                    print(f"[*] duplicate on:\t{ip_addr}")
+                    print(m.group("mac"))
+                    print(check_dict["ip_addr"])
+                    print(20*"#")
+    
+                else:
+                    check_dict[ip_addr] = m.group("mac_addr")
 
-requests = []
+
+def doArping(ip):
+    try:
+        a = subprocess.check_output(f"sudo arping -c 1 {ip} >> {FILE_PATH}", shell=True).encode()
+        
+    except Exception:
+        pass                
+                
+
 
 
 if __name__ == "__main__":
     try:
-        src = Validator.validateIFace(iface=args.interface)
+        # src = Validator.validateIFace(iface=args.interface)
         dst = Validator.validIPAddress(IP=args.range)
         for ip in dst:
             if ip.__contains__(".0") or ip.__contains__(".255"):
                 continue
-            getMac(src, ip)
+            doArping(ip)
 
     except Exception as e:
         print(sys.exc_info()[-1].tb_lineno, e)
         
 
+
+
         
 # ans, unans = net_helper.srp(net_helper.Ether(dst="ff:ff:ff:ff:ff:ff")/net_helper.ARP(pdst="192.168.1.0/24"))
 # ans.summary(lambda s,r: r.sprintf("%Ether.src% %ARP.psrc%") )
+# results, unanswered = sr(ARP(op=ARP.who_has, psrc='192.168.1.2', pdst='192.168.1.1'))
+# 1 req two replies, i have to handle this
