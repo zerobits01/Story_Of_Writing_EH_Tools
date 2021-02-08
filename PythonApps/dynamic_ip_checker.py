@@ -1,8 +1,7 @@
 '''
     author : zerobits01
-    created: 29-Jan-2020
-    purpose: sniffing incoming and outgoing packets
-        usually we use with MITM(e.g : arp_spoofer)
+    created: 28-Jan-2021
+    purpose: sniffing LAN packets and checking ip duplicate and dyanmic IPs
 '''
 
 import re
@@ -10,9 +9,12 @@ import pyshark
 import argparse
 import os
 from colorama import init, Fore
-# initialize colorama
+import subprocess
+from netaddr import IPNetwork
+
 init()
-# define colors
+
+
 GREEN = Fore.GREEN
 RED   = Fore.RED
 RESET = Fore.RESET
@@ -21,6 +23,35 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--iface', help='iface that you wanna sniff it', required=True)
 args = parser.parse_args()
 
+class Validator(object):
+
+    @staticmethod
+    def validateIFace(iface):
+        """checks if input interface is existing or not
+        """
+        command = ["ip", "addr", "show", iface]
+        try:
+            grepOut = subprocess.check_output(' '.join(command), shell=True)
+            out_string = grepOut.decode()
+            # sample inet 192.168.1.158
+            get_ip_regex = re.compile(r"inet (?P<ip_addr>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})")
+            return get_ip_regex.search(out_string).group("ip_addr")                    
+        except subprocess.CalledProcessError as grepexc:
+            print("[!] entered interface doesn't exist")
+            return False
+    
+    
+    @staticmethod
+    def validIPAddress(IP):
+        """
+        :type IP: str
+        :rtype: str
+        """
+        ip_list = []
+        for ip in IPNetwork(IP):
+            ip_list.append(str(ip))
+            
+        return ip_list
 
 
 # cap.apply_on_packets(returnSystemMac, timeout=3)    
@@ -29,7 +60,13 @@ mac_addr  = re.compile(r"Client MAC address: (?P<mac_addr>\S+)")
 host_name = re.compile(r"Host Name: (?P<host_name>\S+)")
 ip_addr   = re.compile(r"Requested IP Address: (?P<ip_addr>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})")
 
-def check_dhcp():
+def doArping(ip):
+    try:
+        subprocess.check_output(f"sudo arping -c 1 {ip}")    
+    except Exception:
+        pass                
+
+def check_dhcp(cap):
     for pkt in cap:
         dhcp_hdr = str(pkt.dhcp)
         m1 = mac_addr.search(dhcp_hdr)
@@ -41,14 +78,22 @@ def check_dhcp():
             ipaddr = m3.group("ip_addr")
             print(hname + ":\t" + mac + "\tgot ip:\t" + ipaddr)
 
-
-def check_duplicate():
-    pass
+def check_duplicate(cap):
+    for pkt in cap:
+        print(pkt)
 
 
 if __name__ == "__main__":
-    cap = pyshark.LiveCapture(interface=args.iface, bpf_filter="port 67 and 68")
-    check_dhcp()
+    dhcp_cap = pyshark.LiveCapture(interface=args.iface, bpf_filter="port 67 and 68")
+    check_dhcp(dhcp_cap)
+    arp_cap = pyshark.LiveCapture(interface=args.iface)
+    check_duplicate(arp_cap)
+    dst = Validator.validIPAddress(IP=args.range)
+    for ip in dst:
+        if ip.__contains__(".0") or ip.__contains__(".255"):
+            continue
+        doArping(ip)
+
 
 # adding monitor mode
 '''
